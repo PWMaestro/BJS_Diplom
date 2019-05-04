@@ -2,22 +2,18 @@
 
 class Profile {
 
-	set userData(userDataObject) {
-		this.username = userDataObject.username;
+	constructor(data) {
+		this.username = data.username;
 		this.name = {
-			firstName: userDataObject.name.firstName,
-			lastName: userDataObject.name.lastName 
+			firstName: data.name.firstName,
+			lastName: data.name.lastName 
 		}
-		this.password = userDataObject.password;
-	}
-
-	get userData() {
-		return Object.assign({}, this);
+		this.password = data.password;
 	}
 
 	createUser(callback) {
 		console.log(`Creating user ${this.username}...`);
-		return ApiConnector.createUser(this.userData, (err, data) => {
+		return ApiConnector.createUser(this, (err, data) => {
 			if (err) {
 				console.error(`Error occured during user ${this.username} loggining in :(`);
 			} else {
@@ -29,7 +25,7 @@ class Profile {
 
 	authorize(callback) {
 		console.log(`User ${this.username} trying to log in...`);
-		return ApiConnector.performLogin(this.userData, (err, data) => {
+		return ApiConnector.performLogin(this, (err, data) => {
 			if (err) {
 				console.error(`Error occured during creating user ${this.username} :(`);
 			} else {
@@ -45,7 +41,7 @@ class Profile {
 			if (err) {
 				console.error(`Error occured during adding money to user ${this.username} :(`);
 			} else {
-				console.log(`User ${this.username} successfully has taken his money!`);
+				console.log(`User ${this.username} has successfully taken his money!`);
 				callback();
 			}
 		});
@@ -59,7 +55,7 @@ class Profile {
 			} else {
 				console.log('Converting successfully completed!');
 				console.log(data);
-				callback();
+				callback(data);
 			}
 		});
 	}
@@ -84,28 +80,39 @@ function getStocks(callback) {
 			console.error('An error occured while trying to access the stock exchange :(');
 		} else {
 			console.log('Done!');
-			callback();
+			callback(data);
 		}
 	} );
+}
+
+function preConvert({fromCurrency, targetCurrency, initialAmount, stocksList}, callback) {
+	console.log('Calculating...');
+	let phrase = fromCurrency + '_' + targetCurrency;
+	let targetAmount = initialAmount * stocksList[99][phrase];
+	console.log(`Done!\nYou can convert ${initialAmount} ${fromCurrency} to ${targetAmount} ${targetCurrency}`);
+	callback(
+		{
+			fromCurrency,
+			targetCurrency,
+			targetAmount
+		});
 }
 
 //-------- -------- -------- Let the show begin! -------- -------- --------
 
 (function main() {
 
-	const ludwig = new Profile()
-	ludwig.userData = {
-			username: 'Ludwig',
-			name: {firstName: 'Людвиг', lastName: 'Айнцвайген'},
-			password: 'ludwigs_pass'
-		}
+	const ludwig = new Profile({
+		username: 'Ludwig',
+		name: {firstName: 'Людвиг', lastName: 'Айнцвайген'},
+		password: 'ludwigs_pass'
+	});
 
-	const verner = new Profile()
-	verner.userData = {
-			username: 'Verner',
-			name: {firstName: 'Вернер', lastName: 'Бэкер'},
-			password: 'verner_pass'
-		}
+	const verner = new Profile({
+		username: 'Verner',
+		name: {firstName: 'Вернер', lastName: 'Бэкер'},
+		password: 'verner_pass'
+	});
 
 	ludwig.createUser( () => {
 		verner.createUser( () => {
@@ -113,24 +120,29 @@ function getStocks(callback) {
 				ludwig.addMoney(
 				{
 					currency: 'EUR',
-					amount: 500000
+					amount: 500001// Javascript can't convert money correctly
 				},
 				() => {
-					getStocks( () => {
-						ludwig.convertMoney(
+					getStocks( (stocksList) => {
+						preConvert(
 						{
 							fromCurrency: 'EUR',
 							targetCurrency: 'NETCOIN',
-							targetAmount: 36000
+							initialAmount: 500000,
+							stocksList
 						},
-						() => {
-							ludwig.transferMoney(
-							{
-								to: 'Verner',
-								amount: 36000
-							},
-							() => {console.log('Hooray!')});
-						});
+						(data) => {
+							ludwig.convertMoney(
+								data,
+								(userObj) => {
+									ludwig.transferMoney(
+									{
+										to: 'Verner',
+										amount: userObj.wallet.NETCOIN
+									},
+								() => {console.log('Hooray!')});
+							});
+						});						
 					});
 				});
 			});
